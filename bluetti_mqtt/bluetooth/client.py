@@ -2,8 +2,7 @@ import asyncio
 from enum import Enum, auto, unique
 import logging
 from typing import Union
-from bleak import BleakClient, BleakError
-from bleak.exc import BleakDeviceNotFoundError
+from bleak import BleakClient, BleakScanner, BleakError
 from bluetti_mqtt.core import DeviceCommand
 from .exc import BadConnectionError, ModbusError, ParseError
 
@@ -33,10 +32,11 @@ class BluetoothClient:
         self.address = address
         self.state = ClientState.NOT_CONNECTED
         self.name = None
-        self.client = BleakClient(self.address)
+        self.client = None
         self.command_queue = asyncio.Queue()
         self.notify_future = None
         self.loop = asyncio.get_running_loop()
+        self._notify_started = False
 
     @property
     def is_ready(self):
@@ -70,23 +70,57 @@ class BluetoothClient:
         finally:
             # Ensure that we disconnect
             if self.client:
-                await self.client.disconnect()
+                try:
+                    if self._notify_started:
+                        await self.client.stop_notify(self.NOTIFY_UUID)
+                except Exception:
+                    pass
+                try:
+                    await self.client.disconnect()
+                except Exception:
+                    pass
 
     async def _connect(self):
         """Establish connection to the bluetooth device"""
-        try:
-            if not self.client.is_connected:
+        while True:
+            try:
+                if self.client and self.client.is_connected:
+                    self.state = ClientState.CONNECTED
+                    return
+                # cleanup old connection
+                if self.client:
+                    try:
+                        if self._notify_started:
+                            await self.client.stop_notify(self.NOTIFY_UUID)
+                            self._notify_started = False
+                    except Exception:
+                        pass
+
+                    try:
+                        await self.client.disconnect()
+                    except Exception:
+                        pass
+                # scan for device (forces BlueZ to recreate device object)
+                device = await BleakScanner.find_device_by_address(self.address, timeout=20)
+
+                if device is None:
+                    logging.warning(f"Device {self.address} not found during scan")
+                    await asyncio.sleep(5)
+                    continue
+
+                self.client = BleakClient(device, timeout=20)
+
                 await self.client.connect()
+
+                self._notify_started = False
                 self.state = ClientState.CONNECTED
-                logging.info(f'Connected to device: {self.address}')
-            else:
-                logging.info(f'Already connected to device: {self.address}')
-                self.state = ClientState.CONNECTED
-        except BleakDeviceNotFoundError:
-            logging.debug(f'Error connecting to device {self.address}: Not found')
-        except (BleakError, EOFError, asyncio.TimeoutError):
-            logging.exception(f'Error connecting to device {self.address}:')
-            await asyncio.sleep(1)
+
+                logging.info(f"Connected to device: {self.address}")
+                return
+
+            except Exception as e:
+                logging.warning(f"BLE connect failed ({self.address}): {type(e).__name__} {e}")
+                await asyncio.sleep(3)
 
     async def _get_name(self):
         """Get device name, which can be parsed for type"""
@@ -100,10 +134,14 @@ class BluetoothClient:
 
     async def _start_listening(self):
         """Register for command response notifications"""
+        if self._notify_started:
+            self.state = ClientState.READY
+            return
         try:
             await self.client.start_notify(
                 self.NOTIFY_UUID,
                 self._notification_handler)
+            self._notify_started = True
             self.state = ClientState.READY
         except BleakError:
             self.state = ClientState.DISCONNECTING
@@ -165,7 +203,18 @@ class BluetoothClient:
         self.command_queue.task_done()
 
     async def _disconnect(self):
-        await self.client.disconnect()
+        try:
+            if self._notify_started:
+                await self.client.stop_notify(self.NOTIFY_UUID)
+                self._notify_started = False
+        except Exception:
+            pass
+
+        try:
+            await self.client.disconnect()
+        except Exception:
+            pass
+
         logging.warning(f'Delayed reconnect to {self.address} after error')
         await asyncio.sleep(5)
         self.state = ClientState.NOT_CONNECTED

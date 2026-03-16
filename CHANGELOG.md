@@ -2,6 +2,10 @@
 
 ## FUTURE
 
+## 0.16.1
+
+* Fix bluez connection issue, update aiomqtt to 2.5.1 
+
 ## 0.16.0
 
 * Fix support ghcr.io/hassio-addons/base-python/${arch}:18.0.0 image
