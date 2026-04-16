@@ -83,6 +83,7 @@ class AC200L(BluettiDevice):
         self.struct.add_bool_field('time_control_on', 3013)
         self.struct.add_uint_field('battery_range_start', 3015)
         self.struct.add_uint_field('battery_range_end', 3016)
+        self.struct.add_uint_field('grid_charge_amps', 3019)
         self.struct.add_bool_field("power_off", 3060)
         self.struct.add_enum_field("auto_sleep_mode", 3061, AutoSleepMode)
 

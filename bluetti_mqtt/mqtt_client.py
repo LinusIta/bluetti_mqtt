@@ -373,6 +373,18 @@ NORMAL_DEVICE_FIELDS = {
             'unit_of_measurement': '%',
         }
     ),
+    'grid_charge_amps': MqttFieldConfig(
+        type=MqttFieldType.NUMERIC,
+        setter=True,
+        advanced=False,
+        home_assistant_extra={
+            'name': 'Grid Charge Amps',
+            'step': 1,
+            'min': 0,
+            'max': 10,
+            'unit_of_measurement': '%',
+        }
+    ),
     'led_mode': MqttFieldConfig(
         type=MqttFieldType.ENUM,
         setter=True,

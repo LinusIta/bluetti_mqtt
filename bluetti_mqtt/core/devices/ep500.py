@@ -89,6 +89,7 @@ class EP500(BluettiDevice):
         self.struct.add_bool_field('time_control_on', 3013)
         self.struct.add_uint_field('battery_range_start', 3015)
         self.struct.add_uint_field('battery_range_end', 3016)
+        self.struct.add_uint_field('grid_charge_amps', 3019)
         # 3031-3033 is the current device time & date without a timezone
         self.struct.add_bool_field('bluetooth_connected', 3036)
         # 3039-3056 is the time control programming

@@ -18,6 +18,7 @@ class EP600(BluettiDevice):
         # 2001-2003 is the current device time & date without a timezone
         self.struct.add_uint_field('battery_range_start', 2022)
         self.struct.add_uint_field('battery_range_end', 2023)
+        self.struct.add_uint_field('grid_charge_amps', 3019)
         self.struct.add_uint_field('max_ac_input_power', 2213)
         self.struct.add_uint_field('max_ac_input_current', 2214)
         self.struct.add_uint_field('max_ac_output_power', 2215)
